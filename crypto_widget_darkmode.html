@@ -1,0 +1,115 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <title>Crypto Market Widget</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels"></script>
+  <style>
+    body { 
+      font-family: Arial, sans-serif; 
+      text-align: center; 
+      padding: 10px; 
+      background-color: #1e1e1e; 
+      color: #f4f4f4; 
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      max-width: 300px;
+      margin: auto;
+    }
+    .card {
+      display: inline-block;
+      margin: 5px;
+      padding: 8px 12px;
+      border-radius: 8px;
+      background: #2a2a2a;
+      font-size: 14px;
+      font-weight: bold;
+      color: #f4f4f4;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.4);
+    }
+    h2 { font-size: 16px; margin-bottom: 5px; }
+    canvas { max-width: 200px; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>📊 Market Sentiment</h2>
+    <!-- Fear & Greed Gauge -->
+    <canvas id="gaugeChart" width="200" height="100"></canvas>
+    <!-- BTC & USDT Dominance -->
+    <div>
+      <div class="card" id="btcDom">BTC Dominance: ...</div>
+      <div class="card" id="usdtDom">USDT Dominance: ...</div>
+    </div>
+  </div>
+
+  <script>
+    const ctx = document.getElementById('gaugeChart').getContext('2d');
+    const gaugeChart = new Chart(ctx, {
+      type: 'doughnut',
+      data: {
+        datasets: [{
+          data: [0, 100],
+          backgroundColor: ['#2ecc71', '#3a3a3a'],
+          borderWidth: 0
+        }]
+      },
+      options: {
+        rotation: -90,
+        circumference: 180,
+        cutout: '70%',
+        plugins: {
+          datalabels: {
+            display: true,
+            formatter: (value, ctx) => {
+              if (ctx.dataIndex === 0) return ctx.chart.data.datasets[0].valueText;
+              return '';
+            },
+            color: '#f4f4f4',
+            font: { size: 16, weight: 'bold' }
+          },
+          legend: { display: false }
+        }
+      },
+      plugins: [ChartDataLabels]
+    });
+
+    async function loadData() {
+      try {
+        const fngRes = await fetch("https://api.alternative.me/fng/");
+        const fngData = await fngRes.json();
+        const fearValue = Number(fngData.data[0].value);
+        const fearStatus = fngData.data[0].value_classification;
+
+        let color = "#95a5a6";
+        if (fearStatus.includes("Extreme Fear")) color = "#e74c3c";
+        else if (fearStatus.includes("Fear")) color = "#e67e22";
+        else if (fearStatus.includes("Greed")) color = "#2ecc71";
+
+        gaugeChart.data.datasets[0].data = [fearValue, 100 - fearValue];
+        gaugeChart.data.datasets[0].backgroundColor = [color, "#3a3a3a"];
+        gaugeChart.data.datasets[0].valueText = `${fearValue} (${fearStatus})`;
+        gaugeChart.update();
+
+        const globalRes = await fetch("https://api.coingecko.com/api/v3/global");
+        const globalData = await globalRes.json();
+        const btc = globalData.data.market_cap_percentage.btc.toFixed(1);
+        const usdt = globalData.data.market_cap_percentage.usdt.toFixed(1);
+
+        document.getElementById("btcDom").textContent = `BTC Dominance: ${btc}%`;
+        document.getElementById("usdtDom").textContent = `USDT Dominance: ${usdt}%`;
+      } catch (err) {
+        console.error("데이터 불러오기 실패:", err);
+      }
+    }
+
+    loadData();
+    setInterval(loadData, 3600000);
+  </script>
+</body>
+</html>
